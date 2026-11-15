@@ -2,7 +2,7 @@
 
 Simulador interactivo para ver cómo se reparte la potencia activa en una red de corriente alterna mallada, y cómo cambia ese reparto al actuar sobre la generación, la topología, la impedancia de las líneas o un transformador desfasador.
 
-**[Abrir el simulador](https://ajrcjf-web.github.io/ac-power-flow-simulator/)** · **[Leer la guía de conceptos (PDF)](docs/flujo_potencia_AC_conceptos.pdf)**
+**[Abrir el simulador](https://ajrcjf-web.github.io/ac-power-flow-simulator/)** · **[Leer la guía de conceptos (PDF)](https://ajrcjf-web.github.io/ac-power-flow-simulator/docs/flujo_potencia_AC_conceptos.pdf)**
 
 ![Captura del simulador](docs/captura.png)
 
