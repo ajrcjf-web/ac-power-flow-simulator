@@ -7,11 +7,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap" rel="stylesheet">
 <style>
-/* Layout: unifilar a la izquierda, palancas a la derecha, tabla de líneas debajo. */
+/* Layout: unifilar y respuesta temporal a la izquierda, palancas a la derecha, tabla de líneas debajo. */
 :root{
   --bg:#f3f5f7; --surface:#ffffff; --ink:#18222d; --muted:#5b6876; --rule:#d5dbe1;
-  --accent:#0b6a8f; --accent-soft:#dcedf4;
+  --accent:#0b6a8f; --accent-soft:#dcedf4; --dc:#6b3fa0;
   --ok:#2c7a4b; --warn:#b26a00; --crit:#c0342b; --off:#9aa5b0;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
   --display:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
   --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -19,15 +20,17 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#11171d; --surface:#1a222b; --ink:#e6ebf0; --muted:#97a4b1; --rule:#2e3944;
-    --accent:#5cb8dc; --accent-soft:#1d3a48;
+    --accent:#5cb8dc; --accent-soft:#1d3a48; --dc:#b99be6;
     --ok:#5fbf85; --warn:#e3a13c; --crit:#f0746a; --off:#5d6a77;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#11171d; --surface:#1a222b; --ink:#e6ebf0; --muted:#97a4b1; --rule:#2e3944;
-  --accent:#5cb8dc; --accent-soft:#1d3a48;
+  --accent:#5cb8dc; --accent-soft:#1d3a48; --dc:#b99be6;
   --ok:#5fbf85; --warn:#e3a13c; --crit:#f0746a; --off:#5d6a77;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -45,9 +48,10 @@ h2{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.04e
 .tile .k{font-size:12px;color:var(--muted)}
 .tile .v{font-family:var(--mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
 .tile .s{font-size:12px;color:var(--muted)}
-.tile.ok{border-left-color:var(--ok)} .tile.warn{border-left-color:var(--warn)} .tile.crit{border-left-color:var(--crit)}
+.tile.ok{border-left-color:var(--ok)} .tile.warn{border-left-color:var(--warn)} .tile.crit{border-left-color:var(--crit)} .tile.dc{border-left-color:var(--dc)}
 .main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
-.diagram{display:flex;flex-direction:column;gap:10px}
+.left{display:flex;flex-direction:column;gap:16px;min-width:0}
+.diagram,.dyn{display:flex;flex-direction:column;gap:10px}
 .diagram svg{width:100%;height:auto;display:block}
 .status{font-size:14px;padding:8px 12px;border-radius:4px;background:var(--accent-soft);border-left:4px solid var(--accent)}
 .status.crit{border-left-color:var(--crit)} .status.warn{border-left-color:var(--warn)} .status.ok{border-left-color:var(--ok)}
@@ -55,12 +59,23 @@ h2{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.04e
 .legend i{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .controls{display:flex;flex-direction:column;gap:14px}
 .group{display:flex;flex-direction:column;gap:10px}
+.group.hv{border:1px solid var(--rule);border-left:4px solid var(--dc);border-radius:4px;padding:10px 12px}
 .row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
 .row label{font-size:14px}
 .row output{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
 .row input[type=range]{grid-column:1/-1}
 .hint{font-size:12px;color:var(--muted);margin:0}
+.hint.lim{color:var(--warn);font-weight:600}
 input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer}
+.check input{margin-top:3px;flex:none}
+.seg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:14px}
+.seg span{margin-right:4px}
+.seg button{padding:3px 9px;font-family:var(--mono);font-size:12px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.pq{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}
+.pq svg{width:150px;height:150px;display:block}
+.pqs{display:flex;flex-direction:column;gap:8px;min-width:0}
 .lines{display:flex;flex-direction:column;gap:6px}
 .lrow{display:grid;grid-template-columns:auto 1fr 54px;gap:10px;align-items:center}
 .lrow label{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap;cursor:pointer}
@@ -80,15 +95,33 @@ th,td{padding:7px 10px;border-bottom:1px solid var(--rule);text-align:right;whit
 th{font-size:12px;font-weight:500;color:var(--muted)}
 th:first-child,td:first-child{text-align:left}
 td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.hvrow td{border-top:2px solid var(--dc)}
 td .bar{display:inline-block;width:90px;height:8px;background:var(--rule);border-radius:4px;vertical-align:middle;margin-right:8px;overflow:hidden}
 td .bar i{display:block;height:100%;border-radius:4px}
 .pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:9px;border:1px solid currentColor;margin-left:6px}
-.c-ok{color:var(--ok)} .c-warn{color:var(--warn)} .c-crit{color:var(--crit)} .c-off{color:var(--off)}
+.c-ok{color:var(--ok)} .c-warn{color:var(--warn)} .c-crit{color:var(--crit)} .c-off{color:var(--off)} .c-dc{color:var(--dc)}
 .up{color:var(--ink)} .zero{color:var(--muted)}
 .tablehead{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;margin-bottom:8px}
 .notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .notes p{margin:6px 0 0;font-size:14px;color:var(--muted);max-width:65ch}
-/* SVG */
+/* Respuesta temporal */
+.dynhead{display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{display:flex;flex-direction:column;gap:1px;border-top:2px solid var(--rule);padding-top:6px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.chart{display:flex;flex-direction:column;gap:4px}
+.chart h3{font-size:13px;font-weight:600;margin:0}
+.chart svg{width:100%;height:auto;display:block;touch-action:none}
+.clegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--muted)}
+.clegend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px}
+.clegend i.dash{border-top-style:dashed}
+.readout{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px;font-variant-numeric:tabular-nums}
+.gridl{stroke:var(--rule);stroke-width:1}
+.axt{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.endl{font-family:var(--body);font-size:11px;fill:var(--ink)}
+.cross{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 3}
+/* SVG de red */
 .ln{stroke-linecap:round;fill:none}
 .flowdash{stroke:var(--surface);stroke-width:1.6;stroke-dasharray:3 13;fill:none;opacity:.9;stroke-linecap:round}
 .flowdash.fwd{animation:fl 1.1s linear infinite}
@@ -105,36 +138,84 @@ td .bar i{display:block;height:100%;border-radius:4px}
 .stub{stroke:var(--muted);stroke-width:1.5;fill:none}
 .loadarrow{fill:var(--muted)}
 .pstsym{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.conv{fill:var(--surface);stroke:var(--dc);stroke-width:2}
+.convx{stroke:var(--dc);stroke-width:1.5}
+.dcl{stroke:var(--dc);stroke-width:2.5;fill:none}
+.dctxt{fill:var(--dc)}
+.vec{fill:var(--surface);stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3}
 .dead .busdot{fill:var(--off)}
-@media (max-width:900px){.main{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){.main{grid-template-columns:1fr}.tiles,.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Simulador de flujo de potencia AC</h1>
-    <div class="formula">Por cada línea: <b>P ≈ (δ₁ − δ₂ + φ) / X</b> &nbsp;·&nbsp; base 100 MVA, V = 1 pu</div>
+    <div class="formula">Línea AC: <b>P ≈ (δ₁ − δ₂ + φ) / X</b> &nbsp;·&nbsp; Enlace HVDC: <b>P = consigna</b> &nbsp;·&nbsp; base 100 MVA</div>
   </header>
 
   <div class="tiles" id="tiles"></div>
 
   <div class="main">
-    <section class="panel diagram" aria-label="Diagrama unifilar">
-      <div class="status" id="status" role="status"></div>
-      <svg id="svg" viewBox="20 22 710 468" role="img" aria-label="Red de cinco nodos con flujos por línea"></svg>
-      <div class="legend">
-        <span><i style="background:var(--ok)"></i>hasta 90 % del límite</span>
-        <span><i style="background:var(--warn)"></i>90 a 100 %</span>
-        <span><i style="background:var(--crit)"></i>sobrecarga</span>
-        <span><i style="background:var(--off)"></i>fuera de servicio</span>
-        <span>El grosor crece con los MW; la flecha indica el sentido.</span>
-      </div>
-    </section>
+    <div class="left">
+      <section class="panel diagram" aria-label="Diagrama unifilar">
+        <div class="status" id="status" role="status"></div>
+        <svg id="svg" viewBox="20 22 710 468" role="img" aria-label="Red de cinco nodos con un enlace HVDC hacia una red vecina"></svg>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>hasta 90 % del límite</span>
+          <span><i style="background:var(--warn)"></i>90 a 100 %</span>
+          <span><i style="background:var(--crit)"></i>sobrecarga</span>
+          <span><i style="background:var(--off)"></i>fuera de servicio</span>
+          <span><i style="background:var(--dc)"></i>enlace HVDC</span>
+        </div>
+      </section>
+
+      <section class="panel dyn" aria-label="Respuesta en el tiempo">
+        <div class="dynhead">
+          <h2 id="dyntitle">Si se pierde G3: frecuencia en el tiempo</h2>
+          <label class="check" for="fsup"><input type="checkbox" id="fsup"><span>Soporte de frecuencia del HVDC</span></label>
+        </div>
+        <div class="stats" id="stats"></div>
+        <div class="chart">
+          <h3>Frecuencia (Hz)</h3>
+          <div class="clegend" id="leg1"></div>
+          <svg id="ch1" viewBox="0 0 720 210" role="img" aria-label="Frecuencia de esta red y de la red vecina tras perder G3"></svg>
+          <div class="readout" id="ro1"></div>
+        </div>
+        <div class="chart">
+          <h3>Potencia adicional entregada tras la falla (MW)</h3>
+          <div class="clegend" id="leg2"></div>
+          <svg id="ch2" viewBox="0 0 720 160" role="img" aria-label="Aporte del HVDC y de los reguladores de los generadores"></svg>
+          <div class="readout" id="ro2"></div>
+        </div>
+        <p class="hint" id="dynnote"></p>
+      </section>
+    </div>
 
     <section class="panel controls" aria-label="Palancas">
       <div class="group">
         <h2>Experimentos</h2>
         <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="group hv">
+        <h2>Enlace HVDC (VSC) Red vecina – Sur</h2>
+        <div class="row"><label for="hset">Consigna de potencia</label><output id="hseto"></output>
+          <input type="range" id="hset" min="-200" max="200" step="5"></div>
+        <div class="seg" id="ramps" role="group" aria-label="Rampa de la consigna"><span>Rampa</span></div>
+        <p class="hint">Positivo importa hacia Sur; negativo exporta. La potencia del enlace sigue la consigna, sin depender de ángulos ni reactancias.</p>
+        <label class="check" for="rb"><input type="checkbox" id="rb"><span>Control de emergencia: ante una sobrecarga, el enlace ajusta su potencia para eliminarla</span></label>
+        <p class="hint" id="rbnote"></p>
+        <div class="pq">
+          <svg id="pq" viewBox="0 0 150 150" role="img" aria-label="Diagrama P-Q del convertidor"></svg>
+          <div class="pqs">
+            <div class="row"><label for="qsur">Q en Sur</label><output id="qsuro"></output>
+              <input type="range" id="qsur" min="-220" max="220" step="5"></div>
+            <div class="row"><label for="qvec">Q en la red vecina</label><output id="qveco"></output>
+              <input type="range" id="qvec" min="-220" max="220" step="5"></div>
+          </div>
+        </div>
+        <p class="hint" id="pqnote"></p>
       </div>
 
       <div class="group">
@@ -173,7 +254,7 @@ td .bar i{display:block;height:100%;border-radius:4px}
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>Línea</th><th>X (pu)</th><th>Δδ + φ (°)</th><th>Flujo (MW)</th><th>Carga sobre el límite</th><th>Límite (MW)</th><th>Cambio vs. referencia (MW)</th>
+          <th>Elemento</th><th>X (pu)</th><th>Δδ + φ (°)</th><th>Flujo (MW)</th><th>Carga sobre el límite</th><th>Límite (MW)</th><th>Cambio vs. referencia (MW)</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -183,22 +264,22 @@ td .bar i{display:block;height:100%;border-radius:4px}
 
   <section class="notes">
     <div class="panel"><h2>Cómo leerlo</h2>
-      <p>Ningún control fija los MW de una línea. Cada palanca cambia inyecciones, reactancias o ángulos, y la red reparte la potencia sola. Observa que al aliviar una línea casi siempre se carga otra.</p></div>
+      <p>En las líneas AC ningún control fija los MW: cada palanca cambia inyecciones, reactancias o ángulos y la red reparte la potencia sola. El enlace HVDC es la excepción: transmite lo que dice su consigna y el resto de la red se reacomoda.</p></div>
     <div class="panel"><h2>Qué calcula</h2>
-      <p>Un flujo de cargas linealizado (flujo DC): sin pérdidas, tensiones en 1 pu y ángulos pequeños, de modo que sen δ ≈ δ. Es la aproximación habitual para estudiar el reparto de potencia activa.</p></div>
+      <p>Un flujo de cargas linealizado (flujo DC): sin pérdidas, tensiones en 1 pu y sen δ ≈ δ. El HVDC entra como una inyección fija en Sur. La respuesta de frecuencia usa un modelo de una masa por red, con regulador primario y carga dependiente de la frecuencia.</p></div>
     <div class="panel"><h2>Qué deja fuera</h2>
-      <p>Potencia reactiva, perfil de tensiones, pérdidas y estabilidad. Si una maniobra aísla un nodo de Norte, el modelo lo da por desenergizado. Los datos de la red son ilustrativos.</p></div>
+      <p>Tensiones y potencia reactiva (la Q del convertidor solo se contrasta con su diagrama P-Q), pérdidas, amortiguamiento de oscilaciones y estabilidad. El HVDC no genera: lo que entra en Sur sale de la red vecina. Los datos son ilustrativos.</p></div>
   </section>
 </div>
 
 <script>
-/* ---------- Modelo: flujo DC, base 100 MVA ---------- */
+/* ---------- Modelo: flujo DC, base 100 MVA, con enlace HVDC por consigna ---------- */
 const NET = {
   buses: [
     {id:1,name:'Norte', load:0,   gen:'G1', slack:true, gmax:450, x:360,y:92},
     {id:2,name:'Oeste', load:0,   gen:'G2', gmax:300, x:130,y:222},
     {id:3,name:'Centro',load:150, x:400,y:242},
-    {id:4,name:'Sur',   load:250, x:300,y:418},
+    {id:4,name:'Sur',   load:250, x:300,y:410},
     {id:5,name:'Este',  load:100, gen:'G3', gmax:200, x:610,y:330},
   ],
   lines: [
@@ -209,15 +290,17 @@ const NET = {
     {id:'E',f:3,t:4,x:0.06,lim:160},
     {id:'F',f:3,t:5,x:0.10,lim:100},
     {id:'G',f:4,t:5,x:0.12,lim:100},
-  ]
+  ],
+  hvdc: {bus:4, pmax:200, s:220}   // VSC: P por consigna en Sur; S nominal en MVA
 };
 const IDX = {}; NET.buses.forEach((b,i)=>IDX[b.id]=i);
 const busOf = id => NET.buses[IDX[id]];
 
-function baseState(){ return {xm:{},on:{},gen:{G2:150,G3:80},loadScale:1,pst:0}; }
-function clone(s){ return JSON.parse(JSON.stringify(s)); }
+function baseState(){ return {xm:{},on:{},gen:{G2:150,G3:80},loadScale:1,pst:0,
+  hvdc:{set:0, ramp:50, qSur:0, qVec:0, runback:false, fsup:true}}; }
 
-function solve(st){
+// phvdc: MW que el enlace inyecta en Sur (negativo = exporta a la red vecina)
+function solve(st, phvdc=0){
   const n = NET.buses.length;
   const lines = NET.lines.map(l=>({...l, x:l.x*(st.xm[l.id]??1), on:st.on[l.id]!==false,
     phi:l.pst ? st.pst*Math.PI/180 : 0}));
@@ -227,9 +310,10 @@ function solve(st){
   while(ch){ ch=false;
     for(const l of lines) if(l.on){ const a=IDX[l.f], b=IDX[l.t];
       if(conn[a]!==conn[b]){ conn[a]=conn[b]=true; ch=true; } } }
+  const hb = IDX[NET.hvdc.bus], pdc = conn[hb] ? phvdc : 0;
   const P = NET.buses.map((b,i)=>{ if(!conn[i]) return 0;
     const g = b.gen && !b.slack ? st.gen[b.gen] : 0;
-    return (g - b.load*st.loadScale)/100; });
+    return (g - b.load*st.loadScale + (i===hb ? pdc : 0))/100; });
   const B = Array.from({length:n},()=>Array(n).fill(0));
   for(const l of lines) if(l.on && conn[IDX[l.f]]){ const a=IDX[l.f], b=IDX[l.t], y=1/l.x;
     B[a][a]+=y; B[b][b]+=y; B[a][b]-=y; B[b][a]-=y; P[a]-=l.phi*y; P[b]+=l.phi*y; }
@@ -240,20 +324,61 @@ function solve(st){
     [M[c],M[p]]=[M[p],M[c]];
     for(let r=0;r<m;r++) if(r!==c){ const k=M[r][c]/M[c][c]; for(let q=c;q<=m;q++) M[r][q]-=k*M[c][q]; } }
   const th=Array(n).fill(0); act.forEach((i,k)=>th[i]=M[k][m]/M[k][k]);
-  const flows={}, dang={};
+  const flows={}, dang={}; let worst=0;
   for(const l of lines){ const a=IDX[l.f], b=IDX[l.t]; const live=l.on && conn[a];
     dang[l.id] = live ? (th[a]-th[b]+l.phi)*180/Math.PI : 0;
-    flows[l.id] = live ? 100*(th[a]-th[b]+l.phi)/l.x : 0; }
-  let g1=0, load=0;
+    flows[l.id] = live ? 100*(th[a]-th[b]+l.phi)/l.x : 0;
+    worst = Math.max(worst, 100*Math.abs(flows[l.id])/l.lim); }
+  let g1=-pdc, load=0;
   NET.buses.forEach((b,i)=>{ if(conn[i]){ load+=b.load*st.loadScale;
     g1 += b.load*st.loadScale - ((b.gen&&!b.slack)?st.gen[b.gen]:0); } });
-  return {flows, dang, theta:th.map(t=>t*180/Math.PI), conn, g1, load, lines};
+  return {flows, dang, theta:th.map(t=>t*180/Math.PI), conn, g1, load, lines, worst, pdc};
 }
+
+// Control de emergencia: la consigna más cercana a la del operador que elimina la sobrecarga.
+function runbackTarget(st, pset){
+  if(solve(st,pset).worst <= 100) return pset;
+  let best=null, bestW=Infinity, near=null;
+  for(let p=-NET.hvdc.pmax; p<=NET.hvdc.pmax; p++){
+    const w=solve(st,p).worst;
+    if(w<bestW){ bestW=w; best=p; }
+    if(w<=100 && (near===null || Math.abs(p-pset)<Math.abs(near-pset))) near=p;
+  }
+  return near!==null ? near : best;
+}
+
+// Límite P-Q del convertidor: |Q| <= sqrt(S² - P²)
+function qLimit(p){ const s=NET.hvdc.s; return Math.sqrt(Math.max(0, s*s - p*p)); }
+
+/* Respuesta de frecuencia tras perder `loss` MW de generación en t = 1 s.
+   Esta red: 2H·S = 5000 MW·s. Red vecina: 80 000 MW·s (16 veces mayor). */
+function freqResponse(loss, pdc0, support){
+  const f0=50, dt=0.005, T=30;
+  const A={M:5000/f0, K:250, Tg:2, D:60}, V={M:80000/f0, K:4000, Tg:5, D:200};
+  const Kdc=300, Tdc=0.05, head=Math.max(0, NET.hvdc.pmax - pdc0);
+  let df=0,pg=0,dfn=0,pgn=0,dp=0;
+  const out={t:[],f:[],fn:[],pdc:[],pgov:[],head};
+  for(let k=0;k<=T/dt;k++){ const t=k*dt;
+    if(k%10===0){ out.t.push(t); out.f.push(f0+df); out.fn.push(f0+dfn); out.pdc.push(pdc0+dp); out.pgov.push(pg); }
+    const ev = t>=1 ? loss : 0;
+    const tgt = support ? Math.min(head, Math.max(0, -Kdc*df)) : 0;
+    const ddf=(-ev+pg+dp-A.D*df)/A.M, dpg=(-A.K*df-pg)/A.Tg;
+    const ddfn=(-dp+pgn-V.D*dfn)/V.M, dpgn=(-V.K*dfn-pgn)/V.Tg, ddp=(tgt-dp)/Tdc;
+    df+=ddf*dt; pg+=dpg*dt; dfn+=ddfn*dt; pgn+=dpgn*dt; dp+=ddp*dt;
+  }
+  out.nadir=Math.min(...out.f); out.nadirN=Math.min(...out.fn); out.peak=Math.max(...out.pdc)-pdc0;
+  return out;
+}
+
 
 /* ---------- Estado ---------- */
 let state = baseState();
-let ref = solve(baseState());
+let pAct = 0;                       // MW que el enlace transmite en este instante
+let ref = solve(baseState(), 0);
 let refLabel = 'caso base';
+let raf = null, lastT = 0;
+const EMERGENCY_RATE = 150;         // MW/s cuando actúa el control de emergencia
+const RAMPS = [[10,'10 MW/s'],[50,'50 MW/s'],[200,'200 MW/s'],[0,'escalón']];
 
 const PRESETS = [
   {name:'Caso base', fn:s=>s, primary:true},
@@ -261,6 +386,8 @@ const PRESETS = [
   {name:'Topología: abrir E', fn:s=>{s.on.E=false; return s;}},
   {name:'Impedancia: X de B al 150 %', fn:s=>{s.xm.B=1.5; return s;}},
   {name:'Desfasador: φ = −2°', fn:s=>{s.pst=-2; return s;}},
+  {name:'HVDC: importar 60 MW', fn:s=>{s.hvdc.set=60; return s;}},
+  {name:'Contingencia: abrir D con control de emergencia', fn:s=>{s.on.D=false; s.hvdc.runback=true; return s;}, animate:true},
 ];
 
 /* ---------- Utilidades ---------- */
@@ -272,13 +399,13 @@ const fmt = (v,d=0) => { const r = Math.abs(v) < 0.5*Math.pow(10,-d) ? 0 : v;
   return r.toFixed(d).replace('-', '−'); };
 const signed = (v,d=0) => { const t = fmt(v,d); return (v>0 && t!=='0' && !t.startsWith('−') ? '+' : '') + t; };
 function sev(pct){ return pct>100.05 ? 'crit' : pct>=90 ? 'warn' : 'ok'; }
+const target = () => state.hvdc.runback ? runbackTarget(state, state.hvdc.set) : state.hvdc.set;
 
 /* ---------- Diagrama ---------- */
-const G = {};  // referencias a nodos SVG
+const G = {};
 function buildSvg(){
   const svg = $('svg');
   const gl = el('g',{},svg), gs = el('g',{},svg), gb = el('g',{},svg), gt = el('g',{},svg);
-  // líneas
   for(const l of NET.lines){
     const a=busOf(l.f), b=busOf(l.t);
     const d=`M${a.x} ${a.y} L${b.x} ${b.y}`;
@@ -286,13 +413,11 @@ function buildSvg(){
     const dash = el('path',{d,class:'flowdash'},gl);
     const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
     const len=Math.hypot(b.x-a.x,b.y-a.y), ux=(b.x-a.x)/len, uy=(b.y-a.y)/len;
-    let nx=-uy, ny=ux; if(ny>0){ nx=-nx; ny=-ny; }      // normal hacia arriba
     const arrow = el('polygon',{points:'-9,-7 9,0 -9,7'},gl);
-    const LP = {A:[228,138,'end'],B:[398,172,'start'],C:[270,204,'middle'],D:[194,330,'end'],
-      E:[368,340,'start'],F:[512,268,'start'],G:[468,398,'start']}[l.id];
-    const tx = LP[0], ty = LP[1], anchor = LP[2];
-    const t1 = el('text',{x:tx,y:ty,class:'svgtxt','text-anchor':anchor},gt);
-    const t2 = el('text',{x:tx,y:ty+15,class:'svgsub','text-anchor':anchor},gt);
+    const LP = {A:[228,138,'end'],B:[398,172,'start'],C:[270,204,'middle'],D:[194,322,'end'],
+      E:[368,334,'start'],F:[512,268,'start'],G:[472,392,'start']}[l.id];
+    const t1 = el('text',{x:LP[0],y:LP[1],class:'svgtxt','text-anchor':LP[2]},gt);
+    const t2 = el('text',{x:LP[0],y:LP[1]+15,class:'svgsub','text-anchor':LP[2]},gt);
     G[l.id] = {base,dash,arrow,t1,t2,mx,my,ang:Math.atan2(uy,ux)*180/Math.PI};
     if(l.pst){
       const px=a.x+(b.x-a.x)*0.26, py=a.y+(b.y-a.y)*0.26;
@@ -301,7 +426,24 @@ function buildSvg(){
       G.pst = el('text',{x:px+20,y:py+4,class:'svgsub'},gt);
     }
   }
-  // generadores y cargas
+  // enlace HVDC: Red vecina — convertidor — línea DC — convertidor — Sur
+  const sur = busOf(NET.hvdc.bus), cy = 440, c1 = 228, c2 = 122;
+  el('path',{d:`M${sur.x} ${sur.y} L${c1+13} ${cy}`,class:'dcl'},gl);
+  el('path',{d:`M${c2+13} ${cy} L${c1-13} ${cy}`,class:'dcl'},gl);
+  G.hdash = el('path',{d:`M${c2+13} ${cy} L${c1-13} ${cy}`,class:'flowdash'},gl);
+  G.harrow = el('polygon',{points:'-8,-6 8,0 -8,6',fill:'var(--dc)'},gl);
+  el('path',{d:`M98 ${cy} L${c2-13} ${cy}`,class:'dcl'},gl);
+  for(const cx of [c1,c2]){
+    el('rect',{x:cx-13,y:cy-13,width:26,height:26,class:'conv'},gs);
+    el('line',{x1:cx-13,y1:cy+13,x2:cx+13,y2:cy-13,class:'convx'},gs);
+  }
+  el('rect',{x:28,y:cy-20,width:70,height:40,rx:8,class:'vec'},gs);
+  el('text',{x:63,y:cy-2,class:'svgname','text-anchor':'middle',style:'font-size:12px'},gt).textContent='Red';
+  el('text',{x:63,y:cy+12,class:'svgname','text-anchor':'middle',style:'font-size:12px'},gt).textContent='vecina';
+  G.ht1 = el('text',{x:(c1+c2)/2,y:cy-22,class:'svgtxt dctxt','text-anchor':'middle'},gt);
+  G.ht2 = el('text',{x:(c1+c2)/2,y:cy+32,class:'svgsub','text-anchor':'middle'},gt);
+  G.hmid = (c1+c2)/2; G.hcy = cy;
+
   const genPos = {1:[0,-52], 2:[-66,0], 5:[66,0]};
   const loadPos = {3:[34,50], 4:[0,50], 5:[0,52]};
   for(const b of NET.buses){
@@ -322,7 +464,7 @@ function buildSvg(){
     }
     el('circle',{cx:b.x,cy:b.y,r:13,class:'busdot'},g);
     el('text',{x:b.x,y:b.y+4,class:'busnum'},g).textContent=b.id;
-    const lab = {1:[24,-6,'start'], 2:[-8,-40,'end'], 3:[22,-14,'start'], 4:[-22,10,'end'], 5:[14,-40,'start']}[b.id];
+    const lab = {1:[24,-6,'start'], 2:[-8,-40,'end'], 3:[22,-14,'start'], 4:[22,22,'start'], 5:[14,-40,'start']}[b.id];
     el('text',{x:b.x+lab[0],y:b.y+lab[1],class:'svgname','text-anchor':lab[2]},gt).textContent=b.name;
     G['ang'+b.id] = el('text',{x:b.x+lab[0],y:b.y+lab[1]+15,class:'svgsub','text-anchor':lab[2]},gt);
   }
@@ -333,7 +475,10 @@ function buildControls(){
   const P = $('presets');
   PRESETS.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.textContent=p.name;
     if(p.primary) b.className='primary';
-    b.addEventListener('click',()=>{ state = p.fn(baseState()); syncInputs(); render(); }); P.appendChild(b); });
+    b.addEventListener('click',()=>{ state = p.fn(baseState()); pAct = p.animate ? 0 : target(); syncInputs(); kick(); }); P.appendChild(b); });
+  const R = $('ramps');
+  RAMPS.forEach(([v,t])=>{ const b=document.createElement('button'); b.type='button'; b.textContent=t; b.dataset.v=v;
+    b.addEventListener('click',()=>{ state.hvdc.ramp=v; syncInputs(); kick(); }); R.appendChild(b); });
   const L = $('lines');
   for(const l of NET.lines){
     const row=document.createElement('div'); row.className='lrow'; row.id='row'+l.id;
@@ -341,36 +486,148 @@ function buildControls(){
       <input type="range" id="xm${l.id}" min="50" max="200" step="5" aria-label="Reactancia de la línea ${l.id} en porcentaje">
       <output id="xo${l.id}"></output>`;
     L.appendChild(row);
-    row.querySelector('#on'+l.id).addEventListener('change',e=>{ state.on[l.id]=e.target.checked; render(); });
-    row.querySelector('#xm'+l.id).addEventListener('input',e=>{ state.xm[l.id]=e.target.value/100; render(); });
+    row.querySelector('#on'+l.id).addEventListener('change',e=>{ state.on[l.id]=e.target.checked; kick(); });
+    row.querySelector('#xm'+l.id).addEventListener('input',e=>{ state.xm[l.id]=e.target.value/100; kick(); });
   }
-  $('g2').addEventListener('input',e=>{ state.gen.G2=+e.target.value; render(); });
-  $('g3').addEventListener('input',e=>{ state.gen.G3=+e.target.value; render(); });
-  $('ld').addEventListener('input',e=>{ state.loadScale=e.target.value/100; render(); });
-  $('pst').addEventListener('input',e=>{ state.pst=+e.target.value; render(); });
-  $('setref').addEventListener('click',()=>{ ref=solve(state); refLabel='estado fijado por ti'; render(); });
+  const bind = (id,ev,fn) => $(id).addEventListener(ev,e=>{ fn(e.target); kick(); });
+  bind('g2','input',t=>state.gen.G2=+t.value);
+  bind('g3','input',t=>state.gen.G3=+t.value);
+  bind('ld','input',t=>state.loadScale=t.value/100);
+  bind('pst','input',t=>state.pst=+t.value);
+  bind('hset','input',t=>state.hvdc.set=+t.value);
+  bind('qsur','input',t=>state.hvdc.qSur=+t.value);
+  bind('qvec','input',t=>state.hvdc.qVec=+t.value);
+  bind('rb','change',t=>state.hvdc.runback=t.checked);
+  bind('fsup','change',t=>state.hvdc.fsup=t.checked);
+  $('setref').addEventListener('click',()=>{ ref=solve(state,pAct); ref.pdcRef=pAct; refLabel='estado fijado por ti'; render(); });
 }
 function syncInputs(){
   $('g2').value=state.gen.G2; $('g3').value=state.gen.G3;
   $('ld').value=Math.round(state.loadScale*100); $('pst').value=state.pst;
+  $('hset').value=state.hvdc.set; $('qsur').value=state.hvdc.qSur; $('qvec').value=state.hvdc.qVec;
+  $('rb').checked=state.hvdc.runback; $('fsup').checked=state.hvdc.fsup;
+  document.querySelectorAll('#ramps button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.v===state.hvdc.ramp)));
   for(const l of NET.lines){ $('on'+l.id).checked = state.on[l.id]!==false;
     $('xm'+l.id).value = Math.round((state.xm[l.id]??1)*100); }
 }
 
+/* ---------- Rampa del enlace ---------- */
+function kick(){ render(); if(raf===null && Math.abs(pAct-target())>0.01){ lastT=performance.now(); raf=requestAnimationFrame(step); } }
+function step(now){
+  const dt=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  const tg=target(), emergency = tg!==state.hvdc.set;
+  const rate = emergency ? EMERGENCY_RATE : state.hvdc.ramp;
+  const d=tg-pAct;
+  if(rate===0 || Math.abs(d)<=rate*dt) pAct=tg; else pAct+=Math.sign(d)*rate*dt;
+  render();
+  raf = Math.abs(pAct-tg)>0.01 ? requestAnimationFrame(step) : null;
+}
+
+/* ---------- Gráficos de tiempo ---------- */
+function niceStep(range, n){ const raw=range/n, p=Math.pow(10,Math.floor(Math.log10(raw))), m=raw/p;
+  return (m<1.5?1:m<3.5?2:m<7.5?5:10)*p; }
+function drawChart(id, roId, t, series, y0, y1, unit, dec){
+  const svg=$(id), vb=svg.viewBox.baseVal, W=vb.width, H=vb.height, L=50, R=150, T=8, Bm=24;
+  svg.innerHTML='';
+  const X=v=>L+(W-L-R)*v/t[t.length-1], Y=v=>T+(H-T-Bm)*(y1-v)/(y1-y0);
+  const st=niceStep(y1-y0,4);
+  for(let v=Math.ceil(y0/st-1e-9)*st; v<=y1+1e-9; v+=st){
+    el('line',{x1:L,x2:W-R,y1:Y(v),y2:Y(v),class:'gridl'},svg);
+    el('text',{x:L-6,y:Y(v)+4,class:'axt','text-anchor':'end'},svg).textContent=fmt(v,dec);
+  }
+  for(let v=0; v<=t[t.length-1]; v+=5)
+    el('text',{x:X(v),y:H-6,class:'axt','text-anchor':'middle'},svg).textContent=v+' s';
+  const ev=el('line',{x1:X(1),x2:X(1),y1:T,y2:H-Bm,class:'cross'},svg);
+  el('text',{x:X(1)+4,y:T+10,class:'axt'},svg).textContent='falla';
+  const ends=[];
+  for(const s of series){
+    const d=s.data.map((v,i)=>(i?'L':'M')+X(t[i]).toFixed(1)+' '+Y(v).toFixed(1)).join('');
+    el('path',{d,fill:'none',stroke:`var(--${s.c})`,'stroke-width':2,'stroke-dasharray':s.dash?'6 4':'none','stroke-linejoin':'round'},svg);
+    const last=s.data[s.data.length-1];
+    el('circle',{cx:X(t[t.length-1]),cy:Y(last),r:4,fill:`var(--${s.c})`,stroke:'var(--surface)','stroke-width':2},svg);
+    ends.push({y:Y(last),txt:`${s.short} ${fmt(last,dec)} ${unit}`});
+  }
+  ends.sort((a,b)=>a.y-b.y);
+  for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<13) ends[i].y=ends[i-1].y+13;
+  for(const e of ends) el('text',{x:W-R+10,y:e.y+4,class:'endl'},svg).textContent=e.txt;
+  // capa de lectura
+  const cross=el('line',{y1:T,y2:H-Bm,class:'cross',style:'display:none'},svg);
+  const dots=series.map(s=>el('circle',{r:4,fill:`var(--${s.c})`,stroke:'var(--surface)','stroke-width':2,style:'display:none'},svg));
+  const hit=el('rect',{x:L,y:T,width:W-L-R,height:H-T-Bm,fill:'transparent'},svg);
+  const ro=$(roId); ro.textContent='Pasa el cursor por el gráfico para leer valores.';
+  const move=e=>{ const r=svg.getBoundingClientRect(); const x=(e.clientX-r.left)*W/r.width;
+    const i=Math.max(0,Math.min(t.length-1,Math.round((x-L)/(W-L-R)*(t.length-1))));
+    cross.setAttribute('x1',X(t[i])); cross.setAttribute('x2',X(t[i])); cross.style.display='';
+    series.forEach((s,k)=>{ dots[k].setAttribute('cx',X(t[i])); dots[k].setAttribute('cy',Y(s.data[i])); dots[k].style.display=''; });
+    ro.textContent=`t = ${t[i].toFixed(1)} s · `+series.map(s=>`${s.short} ${fmt(s.data[i],dec)} ${unit}`).join(' · '); };
+  hit.addEventListener('pointermove',move); hit.addEventListener('pointerdown',move);
+  hit.addEventListener('pointerleave',()=>{ cross.style.display='none'; dots.forEach(d=>d.style.display='none'); });
+}
+let dynKey='';
+function renderDyn(pdc0){
+  const loss=state.gen.G3, sup=state.hvdc.fsup, key=[loss,Math.round(pdc0),sup].join('|');
+  if(key===dynKey) return; dynKey=key;
+  $('dyntitle').textContent = `Si se pierde G3 (${loss} MW): frecuencia en el tiempo`;
+  const a=freqResponse(loss,pdc0,false), b=freqResponse(loss,pdc0,true);
+  const s1=[{c:'s2',short:'sin soporte',name:'Esta red, sin soporte del HVDC',data:a.f,dash:true}];
+  if(sup) s1.push({c:'s1',short:'con soporte',name:'Esta red, con soporte del HVDC',data:b.f});
+  s1.push({c:'s3',short:'red vecina',name:'Red vecina',data:sup?b.fn:a.fn});
+  const lo=Math.min(a.nadir,49.8), y0=Math.floor((lo-0.02)*5)/5;
+  drawChart('ch1','ro1',a.t,s1,y0,50.1,'Hz',2);
+  const cur=sup?b:a;
+  const s2=[{c:'s5',short:'HVDC',name:'Enlace HVDC (sobre su consigna)',data:cur.pdc.map(v=>v-pdc0)},
+            {c:'s4',short:'reguladores',name:'Reguladores de G1 y G2',data:cur.pgov}];
+  const top=Math.max(20, Math.ceil(Math.max(...cur.pgov,...s2[0].data)*1.1/20)*20);
+  drawChart('ch2','ro2',a.t,s2,0,top,'MW',0);
+  const lg=(arr)=>arr.map(s=>`<span><i class="${s.dash?'dash':''}" style="border-color:var(--${s.c})"></i>${s.name}</span>`).join('');
+  $('leg1').innerHTML=lg(s1); $('leg2').innerHTML=lg(s2);
+  $('stats').innerHTML = `
+    <div class="stat"><span class="k">Mínimo sin soporte</span><span class="v">${fmt(a.nadir,2)} Hz</span></div>
+    <div class="stat"><span class="k">Mínimo con soporte</span><span class="v">${sup?fmt(b.nadir,2)+' Hz':'—'}</span></div>
+    <div class="stat"><span class="k">Aporte máximo del HVDC</span><span class="v">${sup?fmt(b.peak)+' MW':'0 MW'}</span></div>
+    <div class="stat"><span class="k">Mínimo en la red vecina</span><span class="v">${fmt(sup?b.nadirN:50,2)} Hz</span></div>`;
+  let note;
+  if(loss===0) note='G3 está en 0 MW: no hay generación que perder. Súbelo para ver la respuesta.';
+  else if(!sup) note='Sin soporte, el enlace mantiene su consigna y la red vecina no nota la falla: el HVDC actúa como cortafuegos entre redes asíncronas.';
+  else if(b.head<loss*0.8) note=`El enlace ya importa ${fmt(pdc0)} MW y solo le quedan ${fmt(b.head)} MW hasta su límite de ${NET.hvdc.pmax} MW: su aporte se satura.`;
+  else note='Con soporte, el enlace sube su importación en décimas de segundo, mucho antes que los reguladores. Esa potencia sale de la red vecina, cuya frecuencia baja un poco.';
+  $('dynnote').textContent=note;
+}
+
+/* ---------- Diagrama P-Q ---------- */
+function renderPQ(){
+  const svg=$('pq'), S=NET.hvdc.s, c=75, k=62/S; svg.innerHTML='';
+  const ql=qLimit(pAct), clamp=q=>Math.max(-ql,Math.min(ql,q));
+  const qs=clamp(state.hvdc.qSur), qv=clamp(state.hvdc.qVec);
+  el('circle',{cx:c,cy:c,r:S*k,fill:'var(--accent-soft)',stroke:'var(--rule)'},svg);
+  el('line',{x1:6,x2:144,y1:c,y2:c,class:'gridl'},svg); el('line',{x1:c,x2:c,y1:6,y2:144,class:'gridl'},svg);
+  for(const s of [-1,1]) el('line',{x1:c+s*NET.hvdc.pmax*k,x2:c+s*NET.hvdc.pmax*k,y1:c-qLimit(NET.hvdc.pmax)*k,y2:c+qLimit(NET.hvdc.pmax)*k,stroke:'var(--muted)','stroke-dasharray':'2 2'},svg);
+  el('text',{x:146,y:c-4,class:'axt','text-anchor':'end'},svg).textContent='P';
+  el('text',{x:c+4,y:12,class:'axt'},svg).textContent='Q';
+  el('circle',{cx:c-pAct*k,cy:c-qv*k,r:5,fill:'var(--surface)',stroke:'var(--dc)','stroke-width':2},svg);
+  el('circle',{cx:c+pAct*k,cy:c-qs*k,r:5,fill:'var(--dc)',stroke:'var(--surface)','stroke-width':1.5},svg);
+  $('qsuro').textContent=signed(qs)+' Mvar'; $('qveco').textContent=signed(qv)+' Mvar';
+  const lim = qs!==state.hvdc.qSur || qv!==state.hvdc.qVec;
+  $('pqnote').className='hint'+(lim?' lim':'');
+  $('pqnote').textContent = lim
+    ? `Q limitada a ±${fmt(ql)} Mvar: con ${fmt(Math.abs(pAct))} MW de P no cabe más dentro de los ${S} MVA del convertidor.`
+    : `Punto lleno: Sur. Punto hueco: red vecina. Cada extremo fija su Q por separado dentro del círculo de ${S} MVA; con esta P caben ±${fmt(ql)} Mvar. Q no altera los flujos de este modelo.`;
+}
+
 /* ---------- Render ---------- */
 function render(){
-  const r = solve(state);
+  const tg=target(), r = solve(state, pAct);
   $('g2o').textContent = state.gen.G2+' MW';
   $('g3o').textContent = state.gen.G3+' MW';
   $('ldo').textContent = Math.round(state.loadScale*100)+' % · '+fmt(r.load)+' MW';
   $('psto').textContent = signed(state.pst,1)+'°';
+  $('hseto').textContent = signed(state.hvdc.set)+' MW';
 
   let over=[], worst=null, rows='';
   for(const l of r.lines){
     const f=r.flows[l.id], pct=100*Math.abs(f)/l.lim, live=l.on && r.conn[IDX[l.f]];
     const s = live ? sev(pct) : 'off';
     if(live){ if(s==='crit') over.push(l.id); if(!worst || pct>worst.pct) worst={id:l.id,pct}; }
-    // diagrama
     const g=G[l.id];
     g.base.setAttribute('stroke', `var(--${s})`);
     g.base.setAttribute('stroke-width', live ? (2.5+7*Math.min(Math.abs(f),300)/300).toFixed(1) : 2);
@@ -384,11 +641,9 @@ function render(){
     g.t1.textContent = live ? `${l.id} · ${fmt(Math.abs(f))} MW` : `${l.id} · abierta`;
     g.t2.textContent = live ? `${fmt(pct)} % de ${l.lim}` : '';
     g.t2.setAttribute('style', live && s!=='ok' ? `fill:var(--${s});font-weight:600` : '');
-    // fila de control
     $('row'+l.id).classList.toggle('is-off', !l.on);
     $('xo'+l.id).textContent = Math.round((state.xm[l.id]??1)*100)+' %';
     $('xm'+l.id).disabled = !l.on;
-    // tabla
     const from = f>=0 ? busOf(l.f).name : busOf(l.t).name, to = f>=0 ? busOf(l.t).name : busOf(l.f).name;
     const d = Math.abs(f) - Math.abs(ref.flows[l.id]);
     const pill = !live ? '<span class="pill c-off">abierta</span>' : s==='crit' ? '<span class="pill c-crit">sobrecarga</span>' : s==='warn' ? '<span class="pill c-warn">cerca del límite</span>' : '';
@@ -400,10 +655,24 @@ function render(){
       <td class="num">${l.lim}</td>
       <td class="num ${Math.abs(d)<0.5?'zero':'up'}">${signed(d)}</td></tr>`;
   }
+  // fila y dibujo del HVDC
+  const hp=r.pdc, hpct=100*Math.abs(hp)/NET.hvdc.pmax, dh=Math.abs(hp)-Math.abs(ref.pdcRef||0);
+  const dir = hp>=0 ? 'Red vecina → Sur' : 'Sur → Red vecina';
+  rows += `<tr class="hvrow"><td><b>HVDC</b> · Red vecina–Sur<span class="pill c-dc">por consigna</span></td>
+    <td class="num zero">no aplica</td><td class="num zero">no aplica</td>
+    <td class="num">${fmt(Math.abs(hp))} <span class="zero">${Math.abs(hp)<0.5?'sin intercambio':dir}</span></td>
+    <td class="num"><span class="bar"><i style="width:${Math.min(hpct,100)}%;background:var(--dc)"></i></span><span class="c-dc">${fmt(hpct)} %</span></td>
+    <td class="num">${NET.hvdc.pmax}</td>
+    <td class="num ${Math.abs(dh)<0.5?'zero':'up'}">${signed(dh)}</td></tr>`;
   $('tbody').innerHTML = rows;
-  $('refnote').textContent = `Referencia: ${refLabel}. El cambio compara los MW en valor absoluto de cada línea.`;
+  $('refnote').textContent = `Referencia: ${refLabel}. El cambio compara los MW en valor absoluto de cada elemento.`;
+  const hmov = Math.abs(hp)>=0.5;
+  G.hdash.style.display = hmov?'':'none'; G.hdash.setAttribute('class','flowdash '+(hp>=0?'fwd':'rev'));
+  G.harrow.style.display = hmov?'':'none';
+  G.harrow.setAttribute('transform',`translate(${G.hmid} ${G.hcy}) rotate(${hp>=0?0:180})`);
+  G.ht1.textContent = `HVDC · ${fmt(Math.abs(hp))} MW`;
+  G.ht2.textContent = Math.abs(hp-tg)>0.5 ? `en rampa hacia ${signed(tg)}` : `consigna ${signed(tg)} MW`;
 
-  // nodos
   const dead=[];
   NET.buses.forEach((b,i)=>{
     G['bus'+b.id].setAttribute('class', r.conn[i]?'':'dead');
@@ -416,23 +685,33 @@ function render(){
   G.genG3.textContent = `${state.gen.G3} MW`;
   G.pst.textContent = `φ ${signed(state.pst,1)}°`;
 
-  // resumen
-  const g1bad = r.g1<0 || r.g1>450;
+  const acted = state.hvdc.runback && tg!==state.hvdc.set;
+  $('rbnote').textContent = !state.hvdc.runback ? '' : acted
+    ? `Actuó: el control llevó el enlace de ${signed(state.hvdc.set)} a ${signed(tg)} MW, a ${EMERGENCY_RATE} MW/s.`
+    : 'Armado: con la consigna actual no hay sobrecarga que corregir.';
+
+  const g1bad = r.g1<-0.5 || r.g1>450.5;
   const wsev = worst ? sev(worst.pct) : 'ok';
-  const maxAng = Math.max(...r.lines.map(l=>Math.abs(r.dang[l.id])));
+  const hsub = Math.abs(hp)<0.5 ? 'sin intercambio con la red vecina' : hp>0 ? `la red vecina entrega ${fmt(hp)} MW` : `la red vecina absorbe ${fmt(-hp)} MW`;
   $('tiles').innerHTML = `
     <div class="tile ${over.length?'crit':'ok'}"><span class="k">Líneas en sobrecarga</span><span class="v">${over.length}</span><span class="s">${over.length?over.join(', '):'ninguna'}</span></div>
     <div class="tile ${wsev}"><span class="k">Línea más cargada</span><span class="v">${worst?fmt(worst.pct)+' %':'—'}</span><span class="s">${worst?'línea '+worst.id:''}</span></div>
     <div class="tile ${g1bad?'crit':'ok'}"><span class="k">G1 (nodo de balance)</span><span class="v">${fmt(r.g1)} MW</span><span class="s">${g1bad?'fuera de su rango 0 a 450 MW':'rango 0 a 450 MW'}</span></div>
-    <div class="tile"><span class="k">Mayor Δδ + φ en una línea</span><span class="v">${fmt(maxAng,1)}°</span><span class="s">demanda servida ${fmt(r.load)} MW</span></div>`;
+    <div class="tile dc"><span class="k">Enlace HVDC hacia Sur</span><span class="v">${signed(hp)} MW</span><span class="s">${hsub}</span></div>`;
 
   let msg, cls;
   if(dead.length){ cls='crit'; msg=`${dead.join(' y ')} ${dead.length>1?'quedaron aislados':'quedó aislado'} de Norte y sin tensión. Cierra alguna línea para reconectar.`; }
-  else if(over.length){ cls='crit'; msg=`Sobrecarga en ${over.length>1?'las líneas':'la línea'} ${over.join(', ')}. Prueba una palanca y mira a dónde se va la potencia.`; }
-  else if(g1bad){ cls='warn'; msg=`G1 tendría que entregar ${fmt(r.g1)} MW, fuera de su rango. Ajusta G2, G3 o la demanda.`; }
+  else if(over.length){ cls='crit'; msg = acted
+      ? `Ni con el enlace en ${signed(tg)} MW se elimina la sobrecarga en ${over.join(', ')}: el HVDC es controlable dentro de sus límites.`
+      : `Sobrecarga en ${over.length>1?'las líneas':'la línea'} ${over.join(', ')}. Prueba una palanca y mira a dónde se va la potencia.`; }
+  else if(g1bad){ cls='warn'; msg=`G1 tendría que entregar ${fmt(r.g1)} MW, fuera de su rango. El enlace traslada potencia, no la crea: ajusta la consigna, G2, G3 o la demanda.`; }
+  else if(acted){ cls='ok'; msg=`El control de emergencia del HVDC eliminó la sobrecarga llevando el enlace a ${signed(tg)} MW.`; }
   else if(wsev==='warn'){ cls='warn'; msg=`Sin sobrecargas, pero la línea ${worst.id} está al ${fmt(worst.pct)} % de su límite.`; }
   else { cls='ok'; msg='Todas las líneas operan por debajo del 90 % de su límite.'; }
   $('status').className='status '+cls; $('status').textContent=msg;
+
+  renderPQ();
+  renderDyn(tg);
 }
 
 buildSvg(); buildControls(); syncInputs(); render();
