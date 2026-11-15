@@ -34,6 +34,7 @@ Palancas sobre la red AC:
 | Palanca | Control en el simulador | Qué representa |
 |---|---|---|
 | Redespacho | Deslizadores de G2 y G3 (G1 cubre la diferencia) | Cambiar dónde se genera |
+| Disponibilidad de generación | Casilla de cada generador | Sacar G1, G2 o G3 de servicio; el primero que queda en servicio hace de nodo de balance |
 | Topología | Casilla de cada línea | Abrir o cerrar interruptores |
 | Impedancia | Deslizador de reactancia por línea, 50 a 200 % | Compensación serie o reactor serie |
 | Desfasador | Ángulo φ de −15° a +15° en la línea B | Transformador desfasador (PST) |

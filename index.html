@@ -62,6 +62,8 @@ h2{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.04e
 .group.hv{border:1px solid var(--rule);border-left:4px solid var(--dc);border-radius:4px;padding:10px 12px}
 .row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
 .row label{font-size:14px}
+.row label.gl{display:flex;gap:8px;align-items:center;cursor:pointer}
+.row.is-off label,.row.is-off output{color:var(--off)}
 .row output{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
 .row input[type=range]{grid-column:1/-1}
 .hint{font-size:12px;color:var(--muted);margin:0}
@@ -144,6 +146,8 @@ td .bar i{display:block;height:100%;border-radius:4px}
 .dctxt{fill:var(--dc)}
 .vec{fill:var(--surface);stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3}
 .dead .busdot{fill:var(--off)}
+.gen.goff{stroke:var(--off);stroke-dasharray:4 3}
+.gentxt.goff{fill:var(--off)}
 @media (max-width:900px){.main{grid-template-columns:1fr}.tiles,.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
@@ -220,13 +224,14 @@ td .bar i{display:block;height:100%;border-radius:4px}
 
       <div class="group">
         <h2>Generación y demanda</h2>
-        <div class="row"><label for="g2">G2 en Oeste</label><output id="g2o"></output>
-          <input type="range" id="g2" min="0" max="300" step="5"></div>
-        <div class="row"><label for="g3">G3 en Este</label><output id="g3o"></output>
-          <input type="range" id="g3" min="0" max="200" step="5"></div>
+        <div class="row"><label class="gl" for="gonG1"><input type="checkbox" id="gonG1">G1 en Norte</label><output id="g1o"></output></div>
+        <div class="row"><label class="gl" for="gonG2"><input type="checkbox" id="gonG2">G2 en Oeste</label><output id="g2o"></output>
+          <input type="range" id="g2" min="0" max="300" step="5" aria-label="Potencia de G2"></div>
+        <div class="row"><label class="gl" for="gonG3"><input type="checkbox" id="gonG3">G3 en Este</label><output id="g3o"></output>
+          <input type="range" id="g3" min="0" max="200" step="5" aria-label="Potencia de G3"></div>
         <div class="row"><label for="ld">Demanda total</label><output id="ldo"></output>
           <input type="range" id="ld" min="60" max="120" step="1"></div>
-        <p class="hint">G1 en Norte cubre la diferencia (nodo de balance). Mover G2 o G3 es un redespacho.</p>
+        <p class="hint">Desmarcar saca el generador de servicio. El primero que quede en servicio (G1, luego G2, luego G3) cubre la diferencia como nodo de balance. Mover G2 o G3 es un redespacho.</p>
       </div>
 
       <div class="group">
@@ -296,7 +301,7 @@ const NET = {
 const IDX = {}; NET.buses.forEach((b,i)=>IDX[b.id]=i);
 const busOf = id => NET.buses[IDX[id]];
 
-function baseState(){ return {xm:{},on:{},gen:{G2:150,G3:80},loadScale:1,pst:0,
+function baseState(){ return {xm:{},on:{},gen:{G2:150,G3:80},gon:{G1:true,G2:true,G3:true},loadScale:1,pst:0,
   hvdc:{set:0, ramp:50, qSur:0, qVec:0, runback:false, fsup:true}}; }
 
 // phvdc: MW que el enlace inyecta en Sur (negativo = exporta a la red vecina)
@@ -304,7 +309,14 @@ function solve(st, phvdc=0){
   const n = NET.buses.length;
   const lines = NET.lines.map(l=>({...l, x:l.x*(st.xm[l.id]??1), on:st.on[l.id]!==false,
     phi:l.pst ? st.pst*Math.PI/180 : 0}));
-  const s = NET.buses.findIndex(b=>b.slack);
+  // El primer generador en servicio (G1, G2, G3) hace de nodo de balance.
+  const inSvc = g => !st.gon || st.gon[g]!==false;
+  const balName = ['G1','G2','G3'].find(inSvc);
+  if(!balName){ const z={}; NET.lines.forEach(l=>z[l.id]=0);
+    return {flows:z, dang:{...z}, theta:Array(n).fill(0), conn:Array(n).fill(false), bal:0, balName:null, balMax:0,
+      load:0, lines, worst:0, pdc:0, blackout:true}; }
+  const s = NET.buses.findIndex(b=>b.gen===balName);
+  const genOf = b => b.gen && b.gen!==balName && inSvc(b.gen) ? st.gen[b.gen] : 0;
   const conn = Array(n).fill(false); conn[s]=true;
   let ch=true;
   while(ch){ ch=false;
@@ -312,8 +324,7 @@ function solve(st, phvdc=0){
       if(conn[a]!==conn[b]){ conn[a]=conn[b]=true; ch=true; } } }
   const hb = IDX[NET.hvdc.bus], pdc = conn[hb] ? phvdc : 0;
   const P = NET.buses.map((b,i)=>{ if(!conn[i]) return 0;
-    const g = b.gen && !b.slack ? st.gen[b.gen] : 0;
-    return (g - b.load*st.loadScale + (i===hb ? pdc : 0))/100; });
+    return (genOf(b) - b.load*st.loadScale + (i===hb ? pdc : 0))/100; });
   const B = Array.from({length:n},()=>Array(n).fill(0));
   for(const l of lines) if(l.on && conn[IDX[l.f]]){ const a=IDX[l.f], b=IDX[l.t], y=1/l.x;
     B[a][a]+=y; B[b][b]+=y; B[a][b]-=y; B[b][a]-=y; P[a]-=l.phi*y; P[b]+=l.phi*y; }
@@ -324,15 +335,16 @@ function solve(st, phvdc=0){
     [M[c],M[p]]=[M[p],M[c]];
     for(let r=0;r<m;r++) if(r!==c){ const k=M[r][c]/M[c][c]; for(let q=c;q<=m;q++) M[r][q]-=k*M[c][q]; } }
   const th=Array(n).fill(0); act.forEach((i,k)=>th[i]=M[k][m]/M[k][k]);
+  if(conn[0]){ const t0=th[0]; for(let i=0;i<n;i++) if(conn[i]) th[i]-=t0; }   // referencia de ángulo en Norte
   const flows={}, dang={}; let worst=0;
   for(const l of lines){ const a=IDX[l.f], b=IDX[l.t]; const live=l.on && conn[a];
     dang[l.id] = live ? (th[a]-th[b]+l.phi)*180/Math.PI : 0;
     flows[l.id] = live ? 100*(th[a]-th[b]+l.phi)/l.x : 0;
     worst = Math.max(worst, 100*Math.abs(flows[l.id])/l.lim); }
-  let g1=-pdc, load=0;
-  NET.buses.forEach((b,i)=>{ if(conn[i]){ load+=b.load*st.loadScale;
-    g1 += b.load*st.loadScale - ((b.gen&&!b.slack)?st.gen[b.gen]:0); } });
-  return {flows, dang, theta:th.map(t=>t*180/Math.PI), conn, g1, load, lines, worst, pdc};
+  let bal=-pdc, load=0;
+  NET.buses.forEach((b,i)=>{ if(conn[i]){ load+=b.load*st.loadScale; bal += b.load*st.loadScale - genOf(b); } });
+  return {flows, dang, theta:th.map(t=>t*180/Math.PI), conn, bal, balName, balMax:NET.buses[s].gmax,
+    load, lines, worst, pdc, blackout:false};
 }
 
 // Control de emergencia: la consigna más cercana a la del operador que elimina la sobrecarga.
@@ -352,9 +364,10 @@ function qLimit(p){ const s=NET.hvdc.s; return Math.sqrt(Math.max(0, s*s - p*p))
 
 /* Respuesta de frecuencia tras perder `loss` MW de generación en t = 1 s.
    Esta red: 2H·S = 5000 MW·s. Red vecina: 80 000 MW·s (16 veces mayor). */
-function freqResponse(loss, pdc0, support){
+// scale: fracción de la generación síncrona que sigue en servicio tras la falla (inercia y regulación).
+function freqResponse(loss, pdc0, support, scale=1){
   const f0=50, dt=0.005, T=30;
-  const A={M:5000/f0, K:250, Tg:2, D:60}, V={M:80000/f0, K:4000, Tg:5, D:200};
+  const A={M:scale*5000/f0, K:scale*250, Tg:2, D:60}, V={M:80000/f0, K:4000, Tg:5, D:200};
   const Kdc=300, Tdc=0.05, head=Math.max(0, NET.hvdc.pmax - pdc0);
   let df=0,pg=0,dfn=0,pgn=0,dp=0;
   const out={t:[],f:[],fn:[],pdc:[],pgov:[],head};
@@ -450,8 +463,8 @@ function buildSvg(){
     const g = el('g',{},gb); G['bus'+b.id]=g;
     if(b.gen){ const [dx,dy]=genPos[b.id];
       el('path',{d:`M${b.x} ${b.y} L${b.x+dx} ${b.y+dy}`,class:'stub'},gs);
-      el('circle',{cx:b.x+dx,cy:b.y+dy,r:17,class:'gen'},gs);
-      el('text',{x:b.x+dx,y:b.y+dy+4,class:'gentxt'},gs).textContent=b.gen;
+      G['gc'+b.gen] = el('circle',{cx:b.x+dx,cy:b.y+dy,r:17,class:'gen'},gs);
+      G['gn'+b.gen] = el('text',{x:b.x+dx,y:b.y+dy+4,class:'gentxt'},gs); G['gn'+b.gen].textContent=b.gen;
       const below = dy===0;
       G['gen'+b.gen] = el('text',{x:b.x+dx+(below?0:26),y:b.y+dy+(below?34:4),class:'svgtxt',
         'text-anchor':below?'middle':'start'},gt);
@@ -498,6 +511,7 @@ function buildControls(){
   bind('qsur','input',t=>state.hvdc.qSur=+t.value);
   bind('qvec','input',t=>state.hvdc.qVec=+t.value);
   bind('rb','change',t=>state.hvdc.runback=t.checked);
+  for(const g of ['G1','G2','G3']) bind('gon'+g,'change',t=>state.gon[g]=t.checked);
   bind('fsup','change',t=>state.hvdc.fsup=t.checked);
   $('setref').addEventListener('click',()=>{ ref=solve(state,pAct); ref.pdcRef=pAct; refLabel='estado fijado por ti'; render(); });
 }
@@ -505,6 +519,7 @@ function syncInputs(){
   $('g2').value=state.gen.G2; $('g3').value=state.gen.G3;
   $('ld').value=Math.round(state.loadScale*100); $('pst').value=state.pst;
   $('hset').value=state.hvdc.set; $('qsur').value=state.hvdc.qSur; $('qvec').value=state.hvdc.qVec;
+  for(const g of ['G1','G2','G3']) $('gon'+g).checked=state.gon[g];
   $('rb').checked=state.hvdc.runback; $('fsup').checked=state.hvdc.fsup;
   document.querySelectorAll('#ramps button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.v===state.hvdc.ramp)));
   for(const l of NET.lines){ $('on'+l.id).checked = state.on[l.id]!==false;
@@ -564,11 +579,13 @@ function drawChart(id, roId, t, series, y0, y1, unit, dec){
   hit.addEventListener('pointerleave',()=>{ cross.style.display='none'; dots.forEach(d=>d.style.display='none'); });
 }
 let dynKey='';
-function renderDyn(pdc0){
-  const loss=state.gen.G3, sup=state.hvdc.fsup, key=[loss,Math.round(pdc0),sup].join('|');
+function renderDyn(pdc0, r){
+  const g3on=state.gon.G3, rest=(state.gon.G1?450:0)+(state.gon.G2?300:0), scale=rest/750;
+  const loss = !g3on || !rest || r.blackout ? 0 : Math.max(0, Math.round(r.balName==='G3' ? r.bal : state.gen.G3));
+  const sup=state.hvdc.fsup, key=[loss,Math.round(pdc0),sup,scale,g3on].join('|');
   if(key===dynKey) return; dynKey=key;
   $('dyntitle').textContent = `Si se pierde G3 (${loss} MW): frecuencia en el tiempo`;
-  const a=freqResponse(loss,pdc0,false), b=freqResponse(loss,pdc0,true);
+  const a=freqResponse(loss,pdc0,false,scale||1), b=freqResponse(loss,pdc0,true,scale||1);
   const s1=[{c:'s2',short:'sin soporte',name:'Esta red, sin soporte del HVDC',data:a.f,dash:true}];
   if(sup) s1.push({c:'s1',short:'con soporte',name:'Esta red, con soporte del HVDC',data:b.f});
   s1.push({c:'s3',short:'red vecina',name:'Red vecina',data:sup?b.fn:a.fn});
@@ -576,7 +593,7 @@ function renderDyn(pdc0){
   drawChart('ch1','ro1',a.t,s1,y0,50.1,'Hz',2);
   const cur=sup?b:a;
   const s2=[{c:'s5',short:'HVDC',name:'Enlace HVDC (sobre su consigna)',data:cur.pdc.map(v=>v-pdc0)},
-            {c:'s4',short:'reguladores',name:'Reguladores de G1 y G2',data:cur.pgov}];
+            {c:'s4',short:'reguladores',name:'Reguladores de los generadores restantes',data:cur.pgov}];
   const top=Math.max(20, Math.ceil(Math.max(...cur.pgov,...s2[0].data)*1.1/20)*20);
   drawChart('ch2','ro2',a.t,s2,0,top,'MW',0);
   const lg=(arr)=>arr.map(s=>`<span><i class="${s.dash?'dash':''}" style="border-color:var(--${s.c})"></i>${s.name}</span>`).join('');
@@ -587,7 +604,11 @@ function renderDyn(pdc0){
     <div class="stat"><span class="k">Aporte máximo del HVDC</span><span class="v">${sup?fmt(b.peak)+' MW':'0 MW'}</span></div>
     <div class="stat"><span class="k">Mínimo en la red vecina</span><span class="v">${fmt(sup?b.nadirN:50,2)} Hz</span></div>`;
   let note;
-  if(loss===0) note='G3 está en 0 MW: no hay generación que perder. Súbelo para ver la respuesta.';
+  if(!g3on) note='G3 está fuera de servicio: no hay falla que simular. Vuelve a ponerlo en servicio para ver la respuesta.';
+  else if(!rest) note='Sin G1 ni G2, perder G3 dejaría la red sin generación síncrona: este modelo no simula ese caso.';
+  else if(loss===0) note='G3 está en 0 MW: no hay generación que perder. Súbelo para ver la respuesta.';
+  else if(scale<1 && sup) note=`Con menos generadores en servicio la red tiene menos inercia y menos regulación (${fmt(scale*100)} % de lo normal): la frecuencia cae más y el soporte rápido del enlace pesa más.`;
+  else if(scale<1) note=`Con menos generadores en servicio la red tiene menos inercia y menos regulación (${fmt(scale*100)} % de lo normal): la frecuencia cae más rápido y más hondo.`;
   else if(!sup) note='Sin soporte, el enlace mantiene su consigna y la red vecina no nota la falla: el HVDC actúa como cortafuegos entre redes asíncronas.';
   else if(b.head<loss*0.8) note=`El enlace ya importa ${fmt(pdc0)} MW y solo le quedan ${fmt(b.head)} MW hasta su límite de ${NET.hvdc.pmax} MW: su aporte se satura.`;
   else note='Con soporte, el enlace sube su importación en décimas de segundo, mucho antes que los reguladores. Esa potencia sale de la red vecina, cuya frecuencia baja un poco.';
@@ -617,8 +638,13 @@ function renderPQ(){
 /* ---------- Render ---------- */
 function render(){
   const tg=target(), r = solve(state, pAct);
-  $('g2o').textContent = state.gen.G2+' MW';
-  $('g3o').textContent = state.gen.G3+' MW';
+  const gout = g => !state.gon[g] || r.blackout ? null : g===r.balName ? r.bal : state.gen[g];
+  for(const g of ['G1','G2','G3']){ const v=gout(g), isBal = g===r.balName;
+    $('g'+g[1]+'o').textContent = v===null ? 'fuera de servicio' : fmt(v)+' MW'+(isBal?' · balance':'');
+    $('gon'+g).closest('.row').classList.toggle('is-off', v===null);
+    if(g!=='G1') $('g'+g[1]).disabled = v===null || isBal;
+    G['gen'+g].textContent = v===null ? 'fuera' : fmt(v)+' MW';
+    G['gc'+g].setAttribute('class','gen'+(state.gon[g]?'':' goff')); G['gn'+g].setAttribute('class','gentxt'+(state.gon[g]?'':' goff')); }
   $('ldo').textContent = Math.round(state.loadScale*100)+' % · '+fmt(r.load)+' MW';
   $('psto').textContent = signed(state.pst,1)+'°';
   $('hseto').textContent = signed(state.hvdc.set)+' MW';
@@ -680,9 +706,6 @@ function render(){
     if(!r.conn[i]) dead.push(b.name);
     if(b.load) G['load'+b.id].textContent = `${fmt(b.load*state.loadScale)} MW`;
   });
-  G.genG1.textContent = `${fmt(r.g1)} MW`;
-  G.genG2.textContent = `${state.gen.G2} MW`;
-  G.genG3.textContent = `${state.gen.G3} MW`;
   G.pst.textContent = `φ ${signed(state.pst,1)}°`;
 
   const acted = state.hvdc.runback && tg!==state.hvdc.set;
@@ -690,28 +713,29 @@ function render(){
     ? `Actuó: el control llevó el enlace de ${signed(state.hvdc.set)} a ${signed(tg)} MW, a ${EMERGENCY_RATE} MW/s.`
     : 'Armado: con la consigna actual no hay sobrecarga que corregir.';
 
-  const g1bad = r.g1<-0.5 || r.g1>450.5;
+  const g1bad = !r.blackout && (r.bal<-0.5 || r.bal>r.balMax+0.5);
   const wsev = worst ? sev(worst.pct) : 'ok';
   const hsub = Math.abs(hp)<0.5 ? 'sin intercambio con la red vecina' : hp>0 ? `la red vecina entrega ${fmt(hp)} MW` : `la red vecina absorbe ${fmt(-hp)} MW`;
   $('tiles').innerHTML = `
     <div class="tile ${over.length?'crit':'ok'}"><span class="k">Líneas en sobrecarga</span><span class="v">${over.length}</span><span class="s">${over.length?over.join(', '):'ninguna'}</span></div>
     <div class="tile ${wsev}"><span class="k">Línea más cargada</span><span class="v">${worst?fmt(worst.pct)+' %':'—'}</span><span class="s">${worst?'línea '+worst.id:''}</span></div>
-    <div class="tile ${g1bad?'crit':'ok'}"><span class="k">G1 (nodo de balance)</span><span class="v">${fmt(r.g1)} MW</span><span class="s">${g1bad?'fuera de su rango 0 a 450 MW':'rango 0 a 450 MW'}</span></div>
+    <div class="tile ${g1bad||r.blackout?'crit':'ok'}"><span class="k">${r.blackout?'Nodo de balance':r.balName+' (nodo de balance)'}</span><span class="v">${r.blackout?'—':fmt(r.bal)+' MW'}</span><span class="s">${r.blackout?'ningún generador en servicio':(g1bad?'fuera de su rango ':'rango ')+'0 a '+r.balMax+' MW'}</span></div>
     <div class="tile dc"><span class="k">Enlace HVDC hacia Sur</span><span class="v">${signed(hp)} MW</span><span class="s">${hsub}</span></div>`;
 
   let msg, cls;
-  if(dead.length){ cls='crit'; msg=`${dead.join(' y ')} ${dead.length>1?'quedaron aislados':'quedó aislado'} de Norte y sin tensión. Cierra alguna línea para reconectar.`; }
+  if(r.blackout){ cls='crit'; msg='No queda ningún generador en servicio: la red está sin tensión. En este modelo el enlace HVDC necesita una red AC energizada para transmitir.'; }
+  else if(dead.length){ cls='crit'; msg=`${dead.join(', ')} ${dead.length>1?'quedaron aislados':'quedó aislado'} del generador de balance (${r.balName}) y sin tensión. Cierra alguna línea para reconectar.`; }
   else if(over.length){ cls='crit'; msg = acted
       ? `Ni con el enlace en ${signed(tg)} MW se elimina la sobrecarga en ${over.join(', ')}: el HVDC es controlable dentro de sus límites.`
       : `Sobrecarga en ${over.length>1?'las líneas':'la línea'} ${over.join(', ')}. Prueba una palanca y mira a dónde se va la potencia.`; }
-  else if(g1bad){ cls='warn'; msg=`G1 tendría que entregar ${fmt(r.g1)} MW, fuera de su rango. El enlace traslada potencia, no la crea: ajusta la consigna, G2, G3 o la demanda.`; }
+  else if(g1bad){ cls='warn'; msg=`${r.balName} tendría que entregar ${fmt(r.bal)} MW y su rango es 0 a ${r.balMax} MW. Falta o sobra generación: ajusta los otros generadores, la consigna del HVDC o la demanda.`; }
   else if(acted){ cls='ok'; msg=`El control de emergencia del HVDC eliminó la sobrecarga llevando el enlace a ${signed(tg)} MW.`; }
   else if(wsev==='warn'){ cls='warn'; msg=`Sin sobrecargas, pero la línea ${worst.id} está al ${fmt(worst.pct)} % de su límite.`; }
   else { cls='ok'; msg='Todas las líneas operan por debajo del 90 % de su límite.'; }
   $('status').className='status '+cls; $('status').textContent=msg;
 
   renderPQ();
-  renderDyn(tg);
+  renderDyn(tg, r);
 }
 
 buildSvg(); buildControls(); syncInputs(); render();
