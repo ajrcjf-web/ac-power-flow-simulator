@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de flujo de potencia AC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap" rel="stylesheet">
+<style>
+/* Layout: unifilar a la izquierda, palancas a la derecha, tabla de líneas debajo. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#18222d; --muted:#5b6876; --rule:#d5dbe1;
+  --accent:#0b6a8f; --accent-soft:#dcedf4;
+  --ok:#2c7a4b; --warn:#b26a00; --crit:#c0342b; --off:#9aa5b0;
+  --display:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11171d; --surface:#1a222b; --ink:#e6ebf0; --muted:#97a4b1; --rule:#2e3944;
+    --accent:#5cb8dc; --accent-soft:#1d3a48;
+    --ok:#5fbf85; --warn:#e3a13c; --crit:#f0746a; --off:#5d6a77;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11171d; --surface:#1a222b; --ink:#e6ebf0; --muted:#97a4b1; --rule:#2e3944;
+  --accent:#5cb8dc; --accent-soft:#1d3a48;
+  --ok:#5fbf85; --warn:#e3a13c; --crit:#f0746a; --off:#5d6a77;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline;justify-content:space-between}
+h1{font-family:var(--display);font-size:26px;font-weight:600;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin:0;color:var(--muted)}
+.formula{font-family:var(--mono);font-size:14px;color:var(--muted)}
+.formula b{color:var(--ink);font-weight:600}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:14px 16px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--rule);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-family:var(--mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.tile .s{font-size:12px;color:var(--muted)}
+.tile.ok{border-left-color:var(--ok)} .tile.warn{border-left-color:var(--warn)} .tile.crit{border-left-color:var(--crit)}
+.main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+.diagram{display:flex;flex-direction:column;gap:10px}
+.diagram svg{width:100%;height:auto;display:block}
+.status{font-size:14px;padding:8px 12px;border-radius:4px;background:var(--accent-soft);border-left:4px solid var(--accent)}
+.status.crit{border-left-color:var(--crit)} .status.warn{border-left-color:var(--warn)} .status.ok{border-left-color:var(--ok)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.controls{display:flex;flex-direction:column;gap:14px}
+.group{display:flex;flex-direction:column;gap:10px}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.row label{font-size:14px}
+.row output{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+.row input[type=range]{grid-column:1/-1}
+.hint{font-size:12px;color:var(--muted);margin:0}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px}
+.lines{display:flex;flex-direction:column;gap:6px}
+.lrow{display:grid;grid-template-columns:auto 1fr 54px;gap:10px;align-items:center}
+.lrow label{display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap;cursor:pointer}
+.lrow label b{font-family:var(--mono);display:inline-block;min-width:1ch}
+.lrow output{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}
+.lrow.is-off output,.lrow.is-off label span{color:var(--off)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-size:13px;padding:6px 12px;border-radius:4px;border:1px solid var(--accent);background:var(--surface);color:var(--accent);cursor:pointer}
+button:hover{background:var(--accent-soft)}
+button.primary{background:var(--accent);color:var(--surface)}
+button.primary:hover{filter:brightness(1.1);background:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+th{font-size:12px;font-weight:500;color:var(--muted)}
+th:first-child,td:first-child{text-align:left}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+td .bar{display:inline-block;width:90px;height:8px;background:var(--rule);border-radius:4px;vertical-align:middle;margin-right:8px;overflow:hidden}
+td .bar i{display:block;height:100%;border-radius:4px}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:9px;border:1px solid currentColor;margin-left:6px}
+.c-ok{color:var(--ok)} .c-warn{color:var(--warn)} .c-crit{color:var(--crit)} .c-off{color:var(--off)}
+.up{color:var(--ink)} .zero{color:var(--muted)}
+.tablehead{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;margin-bottom:8px}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.notes p{margin:6px 0 0;font-size:14px;color:var(--muted);max-width:65ch}
+/* SVG */
+.ln{stroke-linecap:round;fill:none}
+.flowdash{stroke:var(--surface);stroke-width:1.6;stroke-dasharray:3 13;fill:none;opacity:.9;stroke-linecap:round}
+.flowdash.fwd{animation:fl 1.1s linear infinite}
+.flowdash.rev{animation:fl 1.1s linear infinite reverse}
+@keyframes fl{from{stroke-dashoffset:16}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: reduce){.flowdash{animation:none!important}}
+.svgtxt{font-family:var(--mono);font-size:13px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+.svgname{font-family:var(--body);font-size:13px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+.svgsub{font-family:var(--mono);font-size:12px;fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+.busdot{fill:var(--ink);stroke:var(--surface);stroke-width:2}
+.busnum{font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--surface);text-anchor:middle}
+.gen{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.gentxt{font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--accent);text-anchor:middle}
+.stub{stroke:var(--muted);stroke-width:1.5;fill:none}
+.loadarrow{fill:var(--muted)}
+.pstsym{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.dead .busdot{fill:var(--off)}
+@media (max-width:900px){.main{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Simulador de flujo de potencia AC</h1>
+    <div class="formula">Por cada línea: <b>P ≈ (δ₁ − δ₂ + φ) / X</b> &nbsp;·&nbsp; base 100 MVA, V = 1 pu</div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="main">
+    <section class="panel diagram" aria-label="Diagrama unifilar">
+      <div class="status" id="status" role="status"></div>
+      <svg id="svg" viewBox="20 22 710 468" role="img" aria-label="Red de cinco nodos con flujos por línea"></svg>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i>hasta 90 % del límite</span>
+        <span><i style="background:var(--warn)"></i>90 a 100 %</span>
+        <span><i style="background:var(--crit)"></i>sobrecarga</span>
+        <span><i style="background:var(--off)"></i>fuera de servicio</span>
+        <span>El grosor crece con los MW; la flecha indica el sentido.</span>
+      </div>
+    </section>
+
+    <section class="panel controls" aria-label="Palancas">
+      <div class="group">
+        <h2>Experimentos</h2>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="group">
+        <h2>Generación y demanda</h2>
+        <div class="row"><label for="g2">G2 en Oeste</label><output id="g2o"></output>
+          <input type="range" id="g2" min="0" max="300" step="5"></div>
+        <div class="row"><label for="g3">G3 en Este</label><output id="g3o"></output>
+          <input type="range" id="g3" min="0" max="200" step="5"></div>
+        <div class="row"><label for="ld">Demanda total</label><output id="ldo"></output>
+          <input type="range" id="ld" min="60" max="120" step="1"></div>
+        <p class="hint">G1 en Norte cubre la diferencia (nodo de balance). Mover G2 o G3 es un redespacho.</p>
+      </div>
+
+      <div class="group">
+        <h2>Transformador desfasador en la línea B</h2>
+        <div class="row"><label for="pst">Ángulo φ</label><output id="psto"></output>
+          <input type="range" id="pst" min="-15" max="15" step="0.5"></div>
+        <p class="hint">φ positivo empuja potencia de Norte a Centro por B; negativo la frena.</p>
+      </div>
+
+      <div class="group">
+        <h2>Líneas: en servicio y reactancia</h2>
+        <div class="lines" id="lines"></div>
+        <p class="hint">Desmarcar abre la línea (topología). El deslizador escala X entre 50 % (compensación serie) y 200 % (reactor serie).</p>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="tablehead">
+      <h2>Flujos por línea frente a la referencia</h2>
+      <div class="presets">
+        <button id="setref" type="button">Fijar el estado actual como referencia</button>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Línea</th><th>X (pu)</th><th>Δδ + φ (°)</th><th>Flujo (MW)</th><th>Carga sobre el límite</th><th>Límite (MW)</th><th>Cambio vs. referencia (MW)</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="refnote" style="margin-top:8px"></p>
+  </section>
+
+  <section class="notes">
+    <div class="panel"><h2>Cómo leerlo</h2>
+      <p>Ningún control fija los MW de una línea. Cada palanca cambia inyecciones, reactancias o ángulos, y la red reparte la potencia sola. Observa que al aliviar una línea casi siempre se carga otra.</p></div>
+    <div class="panel"><h2>Qué calcula</h2>
+      <p>Un flujo de cargas linealizado (flujo DC): sin pérdidas, tensiones en 1 pu y ángulos pequeños, de modo que sen δ ≈ δ. Es la aproximación habitual para estudiar el reparto de potencia activa.</p></div>
+    <div class="panel"><h2>Qué deja fuera</h2>
+      <p>Potencia reactiva, perfil de tensiones, pérdidas y estabilidad. Si una maniobra aísla un nodo de Norte, el modelo lo da por desenergizado. Los datos de la red son ilustrativos.</p></div>
+  </section>
+</div>
+
+<script>
+/* ---------- Modelo: flujo DC, base 100 MVA ---------- */
+const NET = {
+  buses: [
+    {id:1,name:'Norte', load:0,   gen:'G1', slack:true, gmax:450, x:360,y:92},
+    {id:2,name:'Oeste', load:0,   gen:'G2', gmax:300, x:130,y:222},
+    {id:3,name:'Centro',load:150, x:400,y:242},
+    {id:4,name:'Sur',   load:250, x:300,y:418},
+    {id:5,name:'Este',  load:100, gen:'G3', gmax:200, x:610,y:330},
+  ],
+  lines: [
+    {id:'A',f:1,t:2,x:0.06,lim:200},
+    {id:'B',f:1,t:3,x:0.08,lim:180, pst:true},
+    {id:'C',f:2,t:3,x:0.10,lim:120},
+    {id:'D',f:2,t:4,x:0.12,lim:160},
+    {id:'E',f:3,t:4,x:0.06,lim:160},
+    {id:'F',f:3,t:5,x:0.10,lim:100},
+    {id:'G',f:4,t:5,x:0.12,lim:100},
+  ]
+};
+const IDX = {}; NET.buses.forEach((b,i)=>IDX[b.id]=i);
+const busOf = id => NET.buses[IDX[id]];
+
+function baseState(){ return {xm:{},on:{},gen:{G2:150,G3:80},loadScale:1,pst:0}; }
+function clone(s){ return JSON.parse(JSON.stringify(s)); }
+
+function solve(st){
+  const n = NET.buses.length;
+  const lines = NET.lines.map(l=>({...l, x:l.x*(st.xm[l.id]??1), on:st.on[l.id]!==false,
+    phi:l.pst ? st.pst*Math.PI/180 : 0}));
+  const s = NET.buses.findIndex(b=>b.slack);
+  const conn = Array(n).fill(false); conn[s]=true;
+  let ch=true;
+  while(ch){ ch=false;
+    for(const l of lines) if(l.on){ const a=IDX[l.f], b=IDX[l.t];
+      if(conn[a]!==conn[b]){ conn[a]=conn[b]=true; ch=true; } } }
+  const P = NET.buses.map((b,i)=>{ if(!conn[i]) return 0;
+    const g = b.gen && !b.slack ? st.gen[b.gen] : 0;
+    return (g - b.load*st.loadScale)/100; });
+  const B = Array.from({length:n},()=>Array(n).fill(0));
+  for(const l of lines) if(l.on && conn[IDX[l.f]]){ const a=IDX[l.f], b=IDX[l.t], y=1/l.x;
+    B[a][a]+=y; B[b][b]+=y; B[a][b]-=y; B[b][a]-=y; P[a]-=l.phi*y; P[b]+=l.phi*y; }
+  const act=[]; for(let i=0;i<n;i++) if(i!==s && conn[i]) act.push(i);
+  const m=act.length, M=act.map(i=>[...act.map(j=>B[i][j]), P[i]]);
+  for(let c=0;c<m;c++){ let p=c;
+    for(let r=c+1;r<m;r++) if(Math.abs(M[r][c])>Math.abs(M[p][c])) p=r;
+    [M[c],M[p]]=[M[p],M[c]];
+    for(let r=0;r<m;r++) if(r!==c){ const k=M[r][c]/M[c][c]; for(let q=c;q<=m;q++) M[r][q]-=k*M[c][q]; } }
+  const th=Array(n).fill(0); act.forEach((i,k)=>th[i]=M[k][m]/M[k][k]);
+  const flows={}, dang={};
+  for(const l of lines){ const a=IDX[l.f], b=IDX[l.t]; const live=l.on && conn[a];
+    dang[l.id] = live ? (th[a]-th[b]+l.phi)*180/Math.PI : 0;
+    flows[l.id] = live ? 100*(th[a]-th[b]+l.phi)/l.x : 0; }
+  let g1=0, load=0;
+  NET.buses.forEach((b,i)=>{ if(conn[i]){ load+=b.load*st.loadScale;
+    g1 += b.load*st.loadScale - ((b.gen&&!b.slack)?st.gen[b.gen]:0); } });
+  return {flows, dang, theta:th.map(t=>t*180/Math.PI), conn, g1, load, lines};
+}
+
+/* ---------- Estado ---------- */
+let state = baseState();
+let ref = solve(baseState());
+let refLabel = 'caso base';
+
+const PRESETS = [
+  {name:'Caso base', fn:s=>s, primary:true},
+  {name:'Redespacho: G2 a 50, G3 a 180', fn:s=>{s.gen.G2=50; s.gen.G3=180; return s;}},
+  {name:'Topología: abrir E', fn:s=>{s.on.E=false; return s;}},
+  {name:'Impedancia: X de B al 150 %', fn:s=>{s.xm.B=1.5; return s;}},
+  {name:'Desfasador: φ = −2°', fn:s=>{s.pst=-2; return s;}},
+];
+
+/* ---------- Utilidades ---------- */
+const $ = id => document.getElementById(id);
+const SVGNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs={}, parent){ const e=document.createElementNS(SVGNS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]); if(parent) parent.appendChild(e); return e; }
+const fmt = (v,d=0) => { const r = Math.abs(v) < 0.5*Math.pow(10,-d) ? 0 : v;
+  return r.toFixed(d).replace('-', '−'); };
+const signed = (v,d=0) => { const t = fmt(v,d); return (v>0 && t!=='0' && !t.startsWith('−') ? '+' : '') + t; };
+function sev(pct){ return pct>100.05 ? 'crit' : pct>=90 ? 'warn' : 'ok'; }
+
+/* ---------- Diagrama ---------- */
+const G = {};  // referencias a nodos SVG
+function buildSvg(){
+  const svg = $('svg');
+  const gl = el('g',{},svg), gs = el('g',{},svg), gb = el('g',{},svg), gt = el('g',{},svg);
+  // líneas
+  for(const l of NET.lines){
+    const a=busOf(l.f), b=busOf(l.t);
+    const d=`M${a.x} ${a.y} L${b.x} ${b.y}`;
+    const base = el('path',{d,class:'ln'},gl);
+    const dash = el('path',{d,class:'flowdash'},gl);
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    const len=Math.hypot(b.x-a.x,b.y-a.y), ux=(b.x-a.x)/len, uy=(b.y-a.y)/len;
+    let nx=-uy, ny=ux; if(ny>0){ nx=-nx; ny=-ny; }      // normal hacia arriba
+    const arrow = el('polygon',{points:'-9,-7 9,0 -9,7'},gl);
+    const LP = {A:[228,138,'end'],B:[398,172,'start'],C:[270,204,'middle'],D:[194,330,'end'],
+      E:[368,340,'start'],F:[512,268,'start'],G:[468,398,'start']}[l.id];
+    const tx = LP[0], ty = LP[1], anchor = LP[2];
+    const t1 = el('text',{x:tx,y:ty,class:'svgtxt','text-anchor':anchor},gt);
+    const t2 = el('text',{x:tx,y:ty+15,class:'svgsub','text-anchor':anchor},gt);
+    G[l.id] = {base,dash,arrow,t1,t2,mx,my,ang:Math.atan2(uy,ux)*180/Math.PI};
+    if(l.pst){
+      const px=a.x+(b.x-a.x)*0.26, py=a.y+(b.y-a.y)*0.26;
+      el('circle',{cx:px-ux*6,cy:py-uy*6,r:9,class:'pstsym'},gs);
+      el('circle',{cx:px+ux*6,cy:py+uy*6,r:9,class:'pstsym'},gs);
+      G.pst = el('text',{x:px+20,y:py+4,class:'svgsub'},gt);
+    }
+  }
+  // generadores y cargas
+  const genPos = {1:[0,-52], 2:[-66,0], 5:[66,0]};
+  const loadPos = {3:[34,50], 4:[0,50], 5:[0,52]};
+  for(const b of NET.buses){
+    const g = el('g',{},gb); G['bus'+b.id]=g;
+    if(b.gen){ const [dx,dy]=genPos[b.id];
+      el('path',{d:`M${b.x} ${b.y} L${b.x+dx} ${b.y+dy}`,class:'stub'},gs);
+      el('circle',{cx:b.x+dx,cy:b.y+dy,r:17,class:'gen'},gs);
+      el('text',{x:b.x+dx,y:b.y+dy+4,class:'gentxt'},gs).textContent=b.gen;
+      const below = dy===0;
+      G['gen'+b.gen] = el('text',{x:b.x+dx+(below?0:26),y:b.y+dy+(below?34:4),class:'svgtxt',
+        'text-anchor':below?'middle':'start'},gt);
+    }
+    if(b.load){ const [dx,dy]=loadPos[b.id];
+      const ex=b.x+dx, ey=b.y+dy, L=Math.hypot(dx,dy), vx=dx/L, vy=dy/L;
+      el('path',{d:`M${b.x} ${b.y} L${ex-vx*8} ${ey-vy*8}`,class:'stub'},gs);
+      el('polygon',{points:`${ex},${ey} ${ex-vx*11-vy*6},${ey-vy*11+vx*6} ${ex-vx*11+vy*6},${ey-vy*11-vx*6}`,class:'loadarrow'},gs);
+      G['load'+b.id] = el('text',{x:ex+10,y:ey+3,class:'svgsub'},gt);
+    }
+    el('circle',{cx:b.x,cy:b.y,r:13,class:'busdot'},g);
+    el('text',{x:b.x,y:b.y+4,class:'busnum'},g).textContent=b.id;
+    const lab = {1:[24,-6,'start'], 2:[-8,-40,'end'], 3:[22,-14,'start'], 4:[-22,10,'end'], 5:[14,-40,'start']}[b.id];
+    el('text',{x:b.x+lab[0],y:b.y+lab[1],class:'svgname','text-anchor':lab[2]},gt).textContent=b.name;
+    G['ang'+b.id] = el('text',{x:b.x+lab[0],y:b.y+lab[1]+15,class:'svgsub','text-anchor':lab[2]},gt);
+  }
+}
+
+/* ---------- Controles ---------- */
+function buildControls(){
+  const P = $('presets');
+  PRESETS.forEach(p=>{ const b=document.createElement('button'); b.type='button'; b.textContent=p.name;
+    if(p.primary) b.className='primary';
+    b.addEventListener('click',()=>{ state = p.fn(baseState()); syncInputs(); render(); }); P.appendChild(b); });
+  const L = $('lines');
+  for(const l of NET.lines){
+    const row=document.createElement('div'); row.className='lrow'; row.id='row'+l.id;
+    row.innerHTML = `<label for="on${l.id}"><input type="checkbox" id="on${l.id}"><b>${l.id}</b><span>${busOf(l.f).name}–${busOf(l.t).name}</span></label>
+      <input type="range" id="xm${l.id}" min="50" max="200" step="5" aria-label="Reactancia de la línea ${l.id} en porcentaje">
+      <output id="xo${l.id}"></output>`;
+    L.appendChild(row);
+    row.querySelector('#on'+l.id).addEventListener('change',e=>{ state.on[l.id]=e.target.checked; render(); });
+    row.querySelector('#xm'+l.id).addEventListener('input',e=>{ state.xm[l.id]=e.target.value/100; render(); });
+  }
+  $('g2').addEventListener('input',e=>{ state.gen.G2=+e.target.value; render(); });
+  $('g3').addEventListener('input',e=>{ state.gen.G3=+e.target.value; render(); });
+  $('ld').addEventListener('input',e=>{ state.loadScale=e.target.value/100; render(); });
+  $('pst').addEventListener('input',e=>{ state.pst=+e.target.value; render(); });
+  $('setref').addEventListener('click',()=>{ ref=solve(state); refLabel='estado fijado por ti'; render(); });
+}
+function syncInputs(){
+  $('g2').value=state.gen.G2; $('g3').value=state.gen.G3;
+  $('ld').value=Math.round(state.loadScale*100); $('pst').value=state.pst;
+  for(const l of NET.lines){ $('on'+l.id).checked = state.on[l.id]!==false;
+    $('xm'+l.id).value = Math.round((state.xm[l.id]??1)*100); }
+}
+
+/* ---------- Render ---------- */
+function render(){
+  const r = solve(state);
+  $('g2o').textContent = state.gen.G2+' MW';
+  $('g3o').textContent = state.gen.G3+' MW';
+  $('ldo').textContent = Math.round(state.loadScale*100)+' % · '+fmt(r.load)+' MW';
+  $('psto').textContent = signed(state.pst,1)+'°';
+
+  let over=[], worst=null, rows='';
+  for(const l of r.lines){
+    const f=r.flows[l.id], pct=100*Math.abs(f)/l.lim, live=l.on && r.conn[IDX[l.f]];
+    const s = live ? sev(pct) : 'off';
+    if(live){ if(s==='crit') over.push(l.id); if(!worst || pct>worst.pct) worst={id:l.id,pct}; }
+    // diagrama
+    const g=G[l.id];
+    g.base.setAttribute('stroke', `var(--${s})`);
+    g.base.setAttribute('stroke-width', live ? (2.5+7*Math.min(Math.abs(f),300)/300).toFixed(1) : 2);
+    g.base.setAttribute('stroke-dasharray', live ? 'none' : '6 7');
+    const moving = live && Math.abs(f)>=0.5;
+    g.dash.style.display = moving ? '' : 'none';
+    g.dash.setAttribute('class','flowdash '+(f>=0?'fwd':'rev'));
+    g.arrow.style.display = moving ? '' : 'none';
+    g.arrow.setAttribute('transform',`translate(${g.mx} ${g.my}) rotate(${g.ang+(f<0?180:0)})`);
+    g.arrow.setAttribute('fill',`var(--${s})`);
+    g.t1.textContent = live ? `${l.id} · ${fmt(Math.abs(f))} MW` : `${l.id} · abierta`;
+    g.t2.textContent = live ? `${fmt(pct)} % de ${l.lim}` : '';
+    g.t2.setAttribute('style', live && s!=='ok' ? `fill:var(--${s});font-weight:600` : '');
+    // fila de control
+    $('row'+l.id).classList.toggle('is-off', !l.on);
+    $('xo'+l.id).textContent = Math.round((state.xm[l.id]??1)*100)+' %';
+    $('xm'+l.id).disabled = !l.on;
+    // tabla
+    const from = f>=0 ? busOf(l.f).name : busOf(l.t).name, to = f>=0 ? busOf(l.t).name : busOf(l.f).name;
+    const d = Math.abs(f) - Math.abs(ref.flows[l.id]);
+    const pill = !live ? '<span class="pill c-off">abierta</span>' : s==='crit' ? '<span class="pill c-crit">sobrecarga</span>' : s==='warn' ? '<span class="pill c-warn">cerca del límite</span>' : '';
+    rows += `<tr><td><b>${l.id}</b> · ${busOf(l.f).name}–${busOf(l.t).name}${l.pst?' (con desfasador)':''}${pill}</td>
+      <td class="num">${l.x.toFixed(3)}</td>
+      <td class="num">${live?fmt(Math.abs(r.dang[l.id]),1):'—'}</td>
+      <td class="num">${live?fmt(Math.abs(f))+' <span class="zero">'+from+' → '+to+'</span>':'—'}</td>
+      <td class="num"><span class="bar"><i style="width:${Math.min(pct,100)}%;background:var(--${s})"></i></span><span class="c-${s}">${live?fmt(pct)+' %':'—'}</span></td>
+      <td class="num">${l.lim}</td>
+      <td class="num ${Math.abs(d)<0.5?'zero':'up'}">${signed(d)}</td></tr>`;
+  }
+  $('tbody').innerHTML = rows;
+  $('refnote').textContent = `Referencia: ${refLabel}. El cambio compara los MW en valor absoluto de cada línea.`;
+
+  // nodos
+  const dead=[];
+  NET.buses.forEach((b,i)=>{
+    G['bus'+b.id].setAttribute('class', r.conn[i]?'':'dead');
+    G['ang'+b.id].textContent = r.conn[i] ? `δ = ${fmt(r.theta[i],1)}°` : 'sin tensión';
+    if(!r.conn[i]) dead.push(b.name);
+    if(b.load) G['load'+b.id].textContent = `${fmt(b.load*state.loadScale)} MW`;
+  });
+  G.genG1.textContent = `${fmt(r.g1)} MW`;
+  G.genG2.textContent = `${state.gen.G2} MW`;
+  G.genG3.textContent = `${state.gen.G3} MW`;
+  G.pst.textContent = `φ ${signed(state.pst,1)}°`;
+
+  // resumen
+  const g1bad = r.g1<0 || r.g1>450;
+  const wsev = worst ? sev(worst.pct) : 'ok';
+  const maxAng = Math.max(...r.lines.map(l=>Math.abs(r.dang[l.id])));
+  $('tiles').innerHTML = `
+    <div class="tile ${over.length?'crit':'ok'}"><span class="k">Líneas en sobrecarga</span><span class="v">${over.length}</span><span class="s">${over.length?over.join(', '):'ninguna'}</span></div>
+    <div class="tile ${wsev}"><span class="k">Línea más cargada</span><span class="v">${worst?fmt(worst.pct)+' %':'—'}</span><span class="s">${worst?'línea '+worst.id:''}</span></div>
+    <div class="tile ${g1bad?'crit':'ok'}"><span class="k">G1 (nodo de balance)</span><span class="v">${fmt(r.g1)} MW</span><span class="s">${g1bad?'fuera de su rango 0 a 450 MW':'rango 0 a 450 MW'}</span></div>
+    <div class="tile"><span class="k">Mayor Δδ + φ en una línea</span><span class="v">${fmt(maxAng,1)}°</span><span class="s">demanda servida ${fmt(r.load)} MW</span></div>`;
+
+  let msg, cls;
+  if(dead.length){ cls='crit'; msg=`${dead.join(' y ')} ${dead.length>1?'quedaron aislados':'quedó aislado'} de Norte y sin tensión. Cierra alguna línea para reconectar.`; }
+  else if(over.length){ cls='crit'; msg=`Sobrecarga en ${over.length>1?'las líneas':'la línea'} ${over.join(', ')}. Prueba una palanca y mira a dónde se va la potencia.`; }
+  else if(g1bad){ cls='warn'; msg=`G1 tendría que entregar ${fmt(r.g1)} MW, fuera de su rango. Ajusta G2, G3 o la demanda.`; }
+  else if(wsev==='warn'){ cls='warn'; msg=`Sin sobrecargas, pero la línea ${worst.id} está al ${fmt(worst.pct)} % de su límite.`; }
+  else { cls='ok'; msg='Todas las líneas operan por debajo del 90 % de su límite.'; }
+  $('status').className='status '+cls; $('status').textContent=msg;
+}
+
+buildSvg(); buildControls(); syncInputs(); render();
+</script>
+</body>
+</html>
